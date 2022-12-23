@@ -16,10 +16,7 @@ function _shuffle!(X::AbstractMatrix{T}, y::AbstractVector{T}, X_dims::Int64) wh
   y .= selectdim(y, 1, shuffled_idx)
 end
 
-function _shuffle(data::AbstractVecOrMat; dims::Int64=1)
-  typeof(data)==AbstractVector && dims>1 && error(
-    DimensionMismatch("Abstract Vector objects don't support dims>1")
-  )
+function _shuffle(data::AbstractMatrix; dims::Int64=1)
   n = axes(data, dims)
   shuffled_idx = shuffle(n)
   return shuffled_idx
