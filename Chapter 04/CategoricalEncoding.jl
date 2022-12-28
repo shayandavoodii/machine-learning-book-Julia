@@ -120,4 +120,106 @@ df.categ = levelcode.(categorical(df.categ))
 #    3 │     3      1
 #    4 │     4      2
 # ==============================================================================
+# 3. One-Hot Encoding
+df = DataFrame(
+  color = ["red", "green", "blue"],
+  x = [1, 2, 3]
+)
+# 3×2 DataFrame
+#  Row │ color   x
+#      │ String  Int64
+# ─────┼───────────────
+#    1 │ red         1
+#    2 │ green       2
+#    3 │ blue        3
 
+transform!(df, [:color => ByRow(==(c)) => c for c in unique(df.color)])
+# 3×5 DataFrame
+#  Row │ color   x      red    green  blue
+#      │ String  Int64  Bool   Bool   Bool
+# ─────┼────────────────────────────────────
+#    1 │ red         1   true  false  false
+#    2 │ green       2  false   true  false
+#    3 │ blue        3  false  false   true
+
+function OneHotEncod(vec::Vector{String})
+  vec .== permutedims(unique(vec))
+  
+  #* If I nead Float64 values
+  # convert(Matrix{Float64}, vec .== permutedims(unique(vec)))
+
+  # reduce(hcat, [vec .== i for i=unique(vec)])
+end
+
+transform!(df, Cols(:color) => OneHotEncod => AsTable)
+# 3×5 DataFrame
+#  Row │ color   x      x1     x2     x3
+#      │ String  Int64  Bool   Bool   Bool
+# ─────┼────────────────────────────────────
+#    1 │ red         1   true  false  false
+#    2 │ green       2  false   true  false
+#    3 │ blue        3  false  false   true
+
+#* Using ScikitLearn
+using ScikitLearn
+using DataFrames
+@sk_import preprocessing: OneHotEncoder
+@sk_import compose: ColumnTransformer
+
+encoder = OneHotEncoder(categories="auto", drop="first")
+transformer = ColumnTransformer([
+  ("onehot", encoder, [0]),
+  ("nothing", "passthrough", [1])
+])
+
+encoded = fit_transform!(transformer, Matrix(df))
+encoded = convert(Matrix{Float64}, encoded)
+
+df = DataFrame(
+  encoded,
+  ["red", "green", "x"]
+)
+# 3×3 DataFrame
+#  Row │ red      green    x
+#      │ Float64  Float64  Float64
+# ─────┼───────────────────────────
+#    1 │     0.0      1.0      1.0
+#    2 │     1.0      0.0      2.0
+#    3 │     0.0      0.0      3.0
+
+#* Using PyCall
+using PyCall
+
+py"""
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+
+def oneHotEncode(data, idx_col:int):
+  # a zero based index function
+  # If you want to set the first column as the one that sould be transformed
+  # pass 0 as the second positional argument
+
+  idx_other_cols = [idx for idx in range(1, data.shape[1]) if idx != idx_col]
+
+  encoder = OneHotEncoder(categories="auto", drop="first")
+  transformer = ColumnTransformer([
+    ("onehot", encoder, [idx_col]),
+    ("nothing", "passthrough", idx_other_cols)
+  ])
+
+  encoded = transformer.fit_transform(data)
+  return encoded
+"""
+
+encoded = py"oneHotEncode"(Matrix(df), 0)
+df = DataFrame(
+  encoded,
+  ["red", "green", "x"]
+)
+# 3×3 DataFrame
+#  Row │ red      green    x
+#      │ Float64  Float64  Float64
+# ─────┼───────────────────────────
+#    1 │     0.0      1.0      1.0
+#    2 │     1.0      0.0      2.0
+#    3 │     0.0      0.0      3.0
