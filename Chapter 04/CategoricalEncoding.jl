@@ -144,7 +144,7 @@ transform!(df, [:color => ByRow(==(c)) => c for c in unique(df.color)])
 
 function OneHotEncod(vec::Vector{String})
   vec .== permutedims(unique(vec))
-  
+
   #* If I nead Float64 values
   # convert(Matrix{Float64}, vec .== permutedims(unique(vec)))
 
@@ -223,3 +223,36 @@ df = DataFrame(
 #    1 │     0.0      1.0      1.0
 #    2 │     1.0      0.0      2.0
 #    3 │     0.0      0.0      3.0
+
+# ==============================================================================
+# 4. Frequency Encoding
+df = DataFrame(
+  categ = ["a", "a", "a", "b"],
+  numer = [1, 2, 3, 4],
+)
+# 4×2 DataFrame
+#  Row │ categ   numer
+#      │ String  Int64
+# ─────┼───────────────
+#    1 │ a           1
+#    2 │ a           2
+#    3 │ a           3
+#    4 │ b           4
+transform(
+  df,
+  names(df, String) .=> (
+    x -> select(
+      groupby(DataFrame(x=x), :x),
+      proprow,
+      keepkeys=false
+    ).proprow
+  ),
+  renamecols=false)
+#   4×2 DataFrame
+#   Row │ categ    numer
+#       │ Float64  Int64
+#  ─────┼────────────────
+#     1 │    0.75      1
+#     2 │    0.75      2
+#     3 │    0.75      3
+#     4 │    0.25      4
